@@ -34,7 +34,15 @@ function safeGet(obj, path, defaultValue = '') {
       return defaultValue;
     }
   }
-  return Array.isArray(result) && result.length === 1 ? result[0] : result || defaultValue;
+  // xml2js always returns arrays, so we need to unwrap single elements
+  while (Array.isArray(result) && result.length === 1) {
+    result = result[0];
+  }
+  // Handle string values that come wrapped in objects with _
+  if (result && typeof result === 'object' && '_' in result) {
+    return result._ || defaultValue;
+  }
+  return result || defaultValue;
 }
 
 function escapeHtml(text) {
@@ -66,29 +74,31 @@ function getProficiencyBonus(level) {
 }
 
 function generateCharacterHTML(characterData) {
-  const char = characterData.character;
+  const char = safeGet(characterData, 'character', {});
   
   // Extract basic info
-  const name = safeGet(char, 'name');
-  const race = safeGet(char, 'race');
-  const subrace = safeGet(char, 'subrace');
-  const alignment = safeGet(char, 'alignment');
-  const background = safeGet(char, 'background');
+  const name = safeGet(char, 'name.0.$t') || safeGet(char, 'name.0');
+  const race = safeGet(char, 'race.0.$t') || safeGet(char, 'race.0');
+  const subrace = safeGet(char, 'subrace.0.$t') || safeGet(char, 'subrace.0');
+  const alignment = safeGet(char, 'alignment.0.$t') || safeGet(char, 'alignment.0');
+  const background = safeGet(char, 'background.0.$t') || safeGet(char, 'background.0');
   
   // Calculate total level
   let totalLevel = 0;
   const classesInfo = [];
-  const classes = Array.isArray(char.classes) ? char.classes : [char.classes].filter(Boolean);
+  const classesData = safeGet(char, 'classes.0', {});
   
-  classes.forEach(cls => {
-    if (cls && cls.class) {
-      cls.class.forEach(c => {
-        const className = safeGet(c, 'name');
-        const classLevel = safeGet(c, 'level');
-        const classSpec = safeGet(c, 'specialization');
-        totalLevel += parseInt(classLevel) || 0;
+  // Classes are stored as id-00001, id-00002, etc.
+  Object.keys(classesData).forEach(key => {
+    if (key.startsWith('id-')) {
+      const cls = classesData[key][0];
+      const className = safeGet(cls, 'name.0.$t') || safeGet(cls, 'name.0');
+      const classLevel = safeGet(cls, 'level.0.$t') || safeGet(cls, 'level.0');
+      const classSpec = safeGet(cls, 'specialization.0.$t') || safeGet(cls, 'specialization.0');
+      totalLevel += parseInt(classLevel) || 0;
+      if (className) {
         classesInfo.push({ name: className, level: classLevel, specialization: classSpec });
-      });
+      }
     }
   });
   
@@ -102,95 +112,112 @@ function generateCharacterHTML(characterData) {
     const abil = safeGet(char, `abilities.0.${abilName}.0`);
     if (abil) {
       abilities[abilName] = {
-        score: safeGet(abil, 'score'),
-        bonus: safeGet(abil, 'bonus'),
-        save: safeGet(abil, 'save'),
-        saveprof: safeGet(abil, 'saveprof') === '1'
+        score: safeGet(abil, 'score.0.$t') || safeGet(abil, 'score.0'),
+        bonus: safeGet(abil, 'bonus.0.$t') || safeGet(abil, 'bonus.0'),
+        save: safeGet(abil, 'save.0.$t') || safeGet(abil, 'save.0'),
+        saveprof: (safeGet(abil, 'saveprof.0.$t') || safeGet(abil, 'saveprof.0')) === '1'
       };
     }
   });
   
   // Extract HP
-  const hp = char.hp ? char.hp[0] : {};
-  const hpTotal = safeGet(hp, 'total', '0');
-  const hpWounds = safeGet(hp, 'wounds', '0');
-  const hpTemp = safeGet(hp, 'temporary', '0');
+  const hp = safeGet(char, 'hp.0', {});
+  const hpTotal = safeGet(hp, 'total.0.$t') || safeGet(hp, 'total.0', '0');
+  const hpWounds = safeGet(hp, 'wounds.0.$t') || safeGet(hp, 'wounds.0', '0');
+  const hpTemp = safeGet(hp, 'temporary.0.$t') || safeGet(hp, 'temporary.0', '0');
   
   // Extract AC
-  const ac = safeGet(char, 'defenses.0.ac.0.total', '10');
+  const ac = safeGet(char, 'defenses.0.ac.0.total.0.$t') || safeGet(char, 'defenses.0.ac.0.total.0', '10');
   
   // Extract Speed
-  const speed = safeGet(char, 'speed.0.total', '30');
+  const speed = safeGet(char, 'speed.0.total.0.$t') || safeGet(char, 'speed.0.total.0', '30');
   
   // Extract Initiative
-  let initiative = safeGet(char, 'initiative.0.total');
+  let initiative = safeGet(char, 'initiative.0.total.0.$t') || safeGet(char, 'initiative.0.total.0');
   if (!initiative && abilities.dexterity) {
     initiative = abilities.dexterity.bonus;
   }
   
   // Extract Skills
   const skills = [];
-  const skillList = char.skilllist ? char.skilllist[0].skill || [] : [];
-  skillList.forEach(skill => {
-    skills.push({
-      name: safeGet(skill, 'name'),
-      total: safeGet(skill, 'total'),
-      prof: safeGet(skill, 'prof') === '1',
-      stat: safeGet(skill, 'stat')
-    });
+  const skillListData = safeGet(char, 'skilllist.0', {});
+  Object.keys(skillListData).forEach(key => {
+    if (key.startsWith('id-')) {
+      const skill = skillListData[key][0];
+      skills.push({
+        name: safeGet(skill, 'name.0.$t') || safeGet(skill, 'name.0'),
+        total: safeGet(skill, 'total.0.$t') || safeGet(skill, 'total.0'),
+        prof: (safeGet(skill, 'prof.0.$t') || safeGet(skill, 'prof.0')) === '1',
+        stat: safeGet(skill, 'stat.0.$t') || safeGet(skill, 'stat.0')
+      });
+    }
   });
-  skills.sort((a, b) => a.name.localeCompare(b.name));
+  skills.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   
   // Extract Features
   const features = [];
-  const featureList = char.featurelist ? char.featurelist[0].feature || [] : [];
-  featureList.forEach(feature => {
-    features.push({
-      name: safeGet(feature, 'name'),
-      level: safeGet(feature, 'level')
-    });
+  const featureListData = safeGet(char, 'featurelist.0', {});
+  Object.keys(featureListData).forEach(key => {
+    if (key.startsWith('id-')) {
+      const feature = featureListData[key][0];
+      features.push({
+        name: safeGet(feature, 'name.0.$t') || safeGet(feature, 'name.0'),
+        level: safeGet(feature, 'level.0.$t') || safeGet(feature, 'level.0')
+      });
+    }
   });
   
   // Extract Feats
   const feats = [];
-  const featList = char.featlist ? char.featlist[0].feat || [] : [];
-  featList.forEach(feat => {
-    feats.push({
-      name: safeGet(feat, 'name'),
-      category: safeGet(feat, 'category'),
-      level: safeGet(feat, 'level')
-    });
+  const featListData = safeGet(char, 'featlist.0', {});
+  Object.keys(featListData).forEach(key => {
+    if (key.startsWith('id-')) {
+      const feat = featListData[key][0];
+      feats.push({
+        name: safeGet(feat, 'name.0.$t') || safeGet(feat, 'name.0'),
+        category: safeGet(feat, 'category.0.$t') || safeGet(feat, 'category.0'),
+        level: safeGet(feat, 'level.0.$t') || safeGet(feat, 'level.0')
+      });
+    }
   });
   
   // Extract Inventory
   const inventory = [];
-  const invList = char.inventorylist ? char.inventorylist[0].item || [] : [];
-  invList.forEach(item => {
-    inventory.push({
-      name: safeGet(item, 'name'),
-      count: safeGet(item, 'count', '1'),
-      cost: safeGet(item, 'cost', '')
-    });
+  const invListData = safeGet(char, 'inventorylist.0', {});
+  Object.keys(invListData).forEach(key => {
+    if (key.startsWith('id-')) {
+      const item = invListData[key][0];
+      inventory.push({
+        name: safeGet(item, 'name.0.$t') || safeGet(item, 'name.0'),
+        count: safeGet(item, 'count.0.$t') || safeGet(item, 'count.0', '1'),
+        cost: safeGet(item, 'cost.0.$t') || safeGet(item, 'cost.0', '')
+      });
+    }
   });
   
   // Extract Coins
   const coins = {};
-  const coinsList = char.coins ? char.coins[0].slot || [] : [];
-  coinsList.forEach(coin => {
-    const coinName = safeGet(coin, 'name');
-    const coinAmount = safeGet(coin, 'amount', '0');
-    coins[coinName] = coinAmount;
+  const coinsData = safeGet(char, 'coins.0', {});
+  Object.keys(coinsData).forEach(key => {
+    if (key.startsWith('id-')) {
+      const coin = coinsData[key][0];
+      const coinName = safeGet(coin, 'name.0.$t') || safeGet(coin, 'name.0');
+      const coinAmount = safeGet(coin, 'amount.0.$t') || safeGet(coin, 'amount.0', '0');
+      if (coinName) {
+        coins[coinName] = coinAmount;
+      }
+    }
   });
   
   // Extract Spell Slots
   const spellSlots = {};
-  const powermeta = char.powermeta ? char.powermeta[0] : {};
+  const powermeta = safeGet(char, 'powermeta.0', {});
   for (let i = 1; i <= 9; i++) {
     const slotKey = `spellslots${i}`;
-    if (powermeta[slotKey]) {
+    if (powermeta[slotKey] && powermeta[slotKey][0]) {
       const slot = powermeta[slotKey][0];
-      const maxSlots = safeGet(slot, 'max', '0');
-      const usedSlots = safeGet(slot, 'used', '0');
+      const maxSlots = safeGet(slot, 'max.0.$t') || safeGet(slot, 'max.0', '0');
+      const usedSlots = safeGet(slot, 'used.0.$t') || safeGet(slot, 'used.0', '0');
       if (maxSlots !== '0') {
         spellSlots[i] = { max: maxSlots, used: usedSlots };
       }
@@ -199,32 +226,39 @@ function generateCharacterHTML(characterData) {
   
   // Extract Sorcery Points
   let sorceryPoints = null;
-  const powers = char.powers ? char.powers[0].power || [] : [];
-  powers.forEach(power => {
-    if (safeGet(power, 'name') === 'Sorcery Points') {
-      const max = safeGet(power, 'prepared', '0');
-      const used = safeGet(power, 'locked', '0');
-      if (max !== '0') {
-        sorceryPoints = { max, used };
+  const powersData = safeGet(char, 'powers.0', {});
+  Object.keys(powersData).forEach(key => {
+    if (key.startsWith('id-')) {
+      const power = powersData[key][0];
+      const powerName = safeGet(power, 'name.0.$t') || safeGet(power, 'name.0');
+      if (powerName === 'Sorcery Points') {
+        const max = safeGet(power, 'prepared.0.$t') || safeGet(power, 'prepared.0', '0');
+        const used = safeGet(power, 'locked.0.$t') || safeGet(power, 'locked.0', '0');
+        if (max !== '0') {
+          sorceryPoints = { max, used };
+        }
       }
     }
   });
   
   // Extract Spells
   const spells = [];
-  powers.forEach(power => {
-    const group = safeGet(power, 'group', '');
-    const level = safeGet(power, 'level', '');
-    const school = safeGet(power, 'school', '');
-    
-    if ((group.includes('Spells') || school) && level) {
-      spells.push({
-        name: safeGet(power, 'name'),
-        level: level,
-        prepared: safeGet(power, 'prepared', '0'),
-        school: school,
-        description: safeGet(power, 'description', '')
-      });
+  Object.keys(powersData).forEach(key => {
+    if (key.startsWith('id-')) {
+      const power = powersData[key][0];
+      const group = safeGet(power, 'group.0.$t') || safeGet(power, 'group.0', '');
+      const level = safeGet(power, 'level.0.$t') || safeGet(power, 'level.0', '');
+      const school = safeGet(power, 'school.0.$t') || safeGet(power, 'school.0', '');
+      
+      if ((group.includes('Spells') || school) && level) {
+        spells.push({
+          name: safeGet(power, 'name.0.$t') || safeGet(power, 'name.0'),
+          level: level,
+          prepared: safeGet(power, 'prepared.0.$t') || safeGet(power, 'prepared.0', '0'),
+          school: school,
+          description: safeGet(power, 'description.0.$t') || safeGet(power, 'description.0', '')
+        });
+      }
     }
   });
   spells.sort((a, b) => {
@@ -793,6 +827,25 @@ function generateCharacterHTML(characterData) {
   
   html += `        </div>
     </div>
+    
+    <script>
+        function toggleSpell(element) {
+            const content = element.nextElementSibling;
+            content.classList.toggle('active');
+        }
+        
+        function expandAllSpells() {
+            document.querySelectorAll('.spell-level-content').forEach(el => {
+                el.classList.add('active');
+            });
+        }
+        
+        function collapseAllSpells() {
+            document.querySelectorAll('.spell-level-content').forEach(el => {
+                el.classList.remove('active');
+            });
+        }
+    </script>
 </body>
 </html>`;
   
@@ -819,9 +872,9 @@ app.post('/generate', upload.single('file'), async (req, res) => {
     // Extract character name for filename
     let filename = 'character_sheet.html';
     try {
-      const charName = safeGet(result.root, 'character.0.name.0');
+      const charName = safeGet(result, 'root.character.0.name.0.$t') || safeGet(result, 'root.character.0.name.0');
       if (charName) {
-        const cleanName = charName.replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+        const cleanName = String(charName).replace(/[^a-zA-Z0-9 _-]/g, '').trim();
         if (cleanName) {
           filename = `${cleanName}.html`;
         }
@@ -831,7 +884,7 @@ app.post('/generate', upload.single('file'), async (req, res) => {
     }
     
     // Generate HTML
-    const html = generateCharacterHTML(result.root);
+    const html = generateCharacterHTML(result.root || result);
     
     // Return JSON with HTML and filename
     res.json({
