@@ -348,8 +348,32 @@
                     throw new Error(result.error || 'Error generating character sheet');
                 }
                 
-                // Redirect to preview page (HTML is stored in session on server)
-                window.location.href = result.redirect || '/preview';
+                // Store HTML in localStorage and redirect to preview
+                try {
+                    localStorage.setItem('characterSheet', result.html);
+                    localStorage.setItem('characterSheetFilename', result.filename);
+                    localStorage.setItem('characterSheetName', result.name || 'Character Sheet');
+                } catch (storageError) {
+                    // If localStorage fails, offer direct download instead
+                    console.warn('localStorage failed, downloading directly:', storageError);
+                    const blob = new Blob([result.html], { type: 'text/html' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = result.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showStatus('✅ Character sheet downloaded!', 'success');
+                    spinner.classList.remove('active');
+                    generateBtn.disabled = false;
+                    return;
+                }
+                
+                // Redirect to preview page
+                window.location.href = '/preview.html';
                 
             } catch (error) {
                 console.error('Error:', error);

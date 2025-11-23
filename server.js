@@ -2,18 +2,9 @@ const express = require('express');
 const multer = require('multer');
 const xml2js = require('xml2js');
 const path = require('path');
-const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Session middleware
-app.use(session({
-  secret: 'fgu-character-sheet-secret-key-' + Math.random(),
-  resave: false,
-  saveUninitialized: false,
-  cookie: { maxAge: 3600000 } // 1 hour
-}));
 
 // Configure multer for file uploads (memory storage)
 const upload = multer({
@@ -906,15 +897,12 @@ app.post('/generate', upload.single('file'), async (req, res) => {
     // Generate HTML
     const html = generateCharacterHTML(result.root || result);
     
-    // Store HTML in session
-    req.session.characterSheetHTML = html;
-    req.session.characterSheetFilename = filename;
-    req.session.characterName = charName || 'Character Sheet';
-    
-    // Return JSON with success and redirect
+    // Return HTML directly
     res.json({
       success: true,
-      redirect: '/preview'
+      html: html,
+      filename: filename,
+      name: charName || 'Character Sheet'
     });
     
   } catch (error) {
@@ -925,26 +913,6 @@ app.post('/generate', upload.single('file'), async (req, res) => {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
-});
-
-// Preview route
-app.get('/preview', (req, res) => {
-  if (!req.session.characterSheetHTML) {
-    return res.redirect('/');
-  }
-  res.sendFile(path.join(__dirname, 'public', 'preview.html'));
-});
-
-// API endpoint to get character sheet HTML from session
-app.get('/api/character-sheet', (req, res) => {
-  if (!req.session.characterSheetHTML) {
-    return res.status(404).json({ error: 'No character sheet found' });
-  }
-  res.json({
-    html: req.session.characterSheetHTML,
-    filename: req.session.characterSheetFilename || 'character_sheet.html',
-    name: req.session.characterName || 'Character Sheet'
-  });
 });
 
 app.listen(PORT, () => {
