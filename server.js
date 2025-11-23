@@ -219,10 +219,29 @@ function generateCharacterHTML(characterData) {
   Object.keys(invListData).forEach(key => {
     if (key.startsWith('id-')) {
       const item = invListData[key][0];
+      
+      // Extract description from formatted text
+      let description = '';
+      const descObj = item.description ? item.description[0] : null;
+      if (descObj && descObj.p) {
+        description = descObj.p.map(p => {
+          if (typeof p === 'string') return p.trim();
+          if (p && p._) return p._.trim();
+          if (p && p.b && p.b[0]) {
+            // Handle bold text like "Splash. " followed by description
+            const boldText = p.b[0];
+            const restText = p._ ? p._.trim() : '';
+            return boldText + restText;
+          }
+          return '';
+        }).filter(Boolean).join('\n\n');
+      }
+      
       inventory.push({
         name: safeGet(item, 'name.0'),
         count: safeGet(item, 'count.0', '1'),
-        cost: safeGet(item, 'cost.0', '')
+        cost: safeGet(item, 'cost.0', ''),
+        description: description
       });
     }
   });
@@ -814,7 +833,24 @@ function generateCharacterHTML(characterData) {
   if (inventory.length > 0) {
     inventory.forEach(item => {
       const countText = item.count !== '1' ? ` x${item.count}` : '';
-      html += `                    <li><span>${escapeHtml(item.name)}${escapeHtml(countText)}</span></li>\n`;
+      
+      if (item.description) {
+        // Split description into paragraphs for tooltip
+        const paragraphs = item.description.split('\n\n').filter(Boolean);
+        const tooltipContent = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('');
+        
+        html += `                    <li>
+                        <span class="tooltip-trigger">
+                            <span>${escapeHtml(item.name)}${escapeHtml(countText)}</span>
+                            <span class="tooltip">
+                                <div class="tooltip-title">${escapeHtml(item.name)}</div>
+                                <div class="tooltip-content">${tooltipContent}</div>
+                            </span>
+                        </span>
+                    </li>\n`;
+      } else {
+        html += `                    <li><span>${escapeHtml(item.name)}${escapeHtml(countText)}</span></li>\n`;
+      }
     });
   } else {
     html += `                    <li><em>No equipment</em></li>\n`;
