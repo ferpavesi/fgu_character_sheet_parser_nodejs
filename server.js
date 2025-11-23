@@ -93,11 +93,12 @@ function generateCharacterHTML(characterData) {
     if (key.startsWith('id-')) {
       const cls = classesData[key][0];
       const className = safeGet(cls, 'name.0.$t') || safeGet(cls, 'name.0');
-      const classLevel = safeGet(cls, 'level.0.$t') || safeGet(cls, 'level.0');
+      const classLevel = safeGet(cls, 'level.0.$t') || safeGet(cls, 'level.0') || safeGet(cls, 'level');
       const classSpec = safeGet(cls, 'specialization.0.$t') || safeGet(cls, 'specialization.0');
-      totalLevel += parseInt(classLevel) || 0;
+      const levelNum = parseInt(classLevel) || 0;
+      totalLevel += levelNum;
       if (className) {
-        classesInfo.push({ name: className, level: classLevel, specialization: classSpec });
+        classesInfo.push({ name: className, level: classLevel || levelNum.toString(), specialization: classSpec });
       }
     }
   });
