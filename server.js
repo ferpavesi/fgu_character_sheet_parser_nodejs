@@ -857,6 +857,10 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+app.get('/preview', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'preview.html'));
+});
+
 app.post('/generate', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {

@@ -348,22 +348,16 @@
                     throw new Error(result.error || 'Error generating character sheet');
                 }
                 
-                const blob = new Blob([result.html], { type: 'text/html' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = result.filename || 'character_sheet.html';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
+                // Store the HTML and filename for preview
+                sessionStorage.setItem('characterSheet', result.html);
+                sessionStorage.setItem('characterSheetFilename', result.filename);
                 
-                showStatus('✅ Character sheet generated successfully! Check your downloads.', 'success');
+                // Redirect to preview page
+                window.location.href = '/preview';
                 
             } catch (error) {
                 console.error('Error:', error);
                 showStatus('❌ Error: ' + error.message, 'error');
-            } finally {
                 spinner.classList.remove('active');
                 generateBtn.disabled = false;
             }
