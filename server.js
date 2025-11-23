@@ -82,11 +82,11 @@ function generateCharacterHTML(characterData) {
   const char = safeGet(characterData, 'character', {});
   
   // Extract basic info
-  const name = safeGet(char, 'name.0.$t') || safeGet(char, 'name.0');
-  const race = safeGet(char, 'race.0.$t') || safeGet(char, 'race.0');
-  const subrace = safeGet(char, 'subrace.0.$t') || safeGet(char, 'subrace.0');
-  const alignment = safeGet(char, 'alignment.0.$t') || safeGet(char, 'alignment.0');
-  const background = safeGet(char, 'background.0.$t') || safeGet(char, 'background.0');
+  const name = safeGet(char, 'name.0');
+  const race = safeGet(char, 'race.0');
+  const subrace = safeGet(char, 'subrace.0');
+  const alignment = safeGet(char, 'alignment.0');
+  const background = safeGet(char, 'background.0');
   
   // Calculate total level
   let totalLevel = 0;
