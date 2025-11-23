@@ -166,9 +166,22 @@ function generateCharacterHTML(characterData) {
   Object.keys(featureListData).forEach(key => {
     if (key.startsWith('id-')) {
       const feature = featureListData[key][0];
+      
+      // Extract description from formatted text
+      let description = '';
+      const textObj = feature.text ? feature.text[0] : null;
+      if (textObj && textObj.p) {
+        description = textObj.p.map(p => {
+          if (typeof p === 'string') return p.trim();
+          if (p && p._) return p._.trim();
+          return '';
+        }).filter(Boolean).join('\n\n');
+      }
+      
       features.push({
         name: safeGet(feature, 'name.0'),
-        level: safeGet(feature, 'level.0')
+        level: safeGet(feature, 'level.0'),
+        description: description
       });
     }
   });
@@ -179,10 +192,23 @@ function generateCharacterHTML(characterData) {
   Object.keys(featListData).forEach(key => {
     if (key.startsWith('id-')) {
       const feat = featListData[key][0];
+      
+      // Extract description from formatted text
+      let description = '';
+      const textObj = feat.text ? feat.text[0] : null;
+      if (textObj && textObj.p) {
+        description = textObj.p.map(p => {
+          if (typeof p === 'string') return p.trim();
+          if (p && p._) return p._.trim();
+          return '';
+        }).filter(Boolean).join('\n\n');
+      }
+      
       feats.push({
         name: safeGet(feat, 'name.0'),
         category: safeGet(feat, 'category.0'),
-        level: safeGet(feat, 'level.0')
+        level: safeGet(feat, 'level.0'),
+        description: description
       });
     }
   });
@@ -517,6 +543,45 @@ function generateCharacterHTML(characterData) {
             padding-top: 6px;
             border-top: 1px dotted #ccc;
         }
+        .tooltip-trigger {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dotted #8b6914;
+        }
+        .tooltip {
+            display: none;
+            position: absolute;
+            left: 0;
+            top: 100%;
+            z-index: 1000;
+            background: white;
+            border: 2px solid #8b6914;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 5px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            min-width: 300px;
+            font-size: 0.9em;
+            line-height: 1.4;
+            white-space: normal;
+        }
+        .tooltip-trigger:hover .tooltip {
+            display: block;
+        }
+        .tooltip-title {
+            font-weight: bold;
+            color: #8b6914;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #8b6914;
+        }
+        .tooltip-content {
+            color: #2c1810;
+        }
+        .tooltip-content p {
+            margin: 6px 0;
+        }
         @media (max-width: 900px) {
             body { padding: 4px; }
             .character-sheet { padding: 6px; border: 2px solid #8b6914; }
@@ -682,7 +747,23 @@ function generateCharacterHTML(characterData) {
   
   if (features.length > 0) {
     features.forEach(feature => {
-      html += `                            <li><strong>${escapeHtml(feature.name)}</strong> (Lvl ${escapeHtml(feature.level)})</li>\n`;
+      if (feature.description) {
+        // Split description into paragraphs for tooltip
+        const paragraphs = feature.description.split('\n\n').filter(Boolean);
+        const tooltipContent = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('');
+        
+        html += `                            <li>
+                                <span class="tooltip-trigger">
+                                    <strong>${escapeHtml(feature.name)}</strong> (Lvl ${escapeHtml(feature.level)})
+                                    <span class="tooltip">
+                                        <div class="tooltip-title">${escapeHtml(feature.name)}</div>
+                                        <div class="tooltip-content">${tooltipContent}</div>
+                                    </span>
+                                </span>
+                            </li>\n`;
+      } else {
+        html += `                            <li><strong>${escapeHtml(feature.name)}</strong> (Lvl ${escapeHtml(feature.level)})</li>\n`;
+      }
     });
   } else {
     html += `                            <li><em>No features</em></li>\n`;
@@ -697,7 +778,23 @@ function generateCharacterHTML(characterData) {
   
   if (feats.length > 0) {
     feats.forEach(feat => {
-      html += `                            <li><strong>${escapeHtml(feat.name)}</strong></li>\n`;
+      if (feat.description) {
+        // Split description into paragraphs for tooltip
+        const paragraphs = feat.description.split('\n\n').filter(Boolean);
+        const tooltipContent = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('');
+        
+        html += `                            <li>
+                                <span class="tooltip-trigger">
+                                    <strong>${escapeHtml(feat.name)}</strong>
+                                    <span class="tooltip">
+                                        <div class="tooltip-title">${escapeHtml(feat.name)}</div>
+                                        <div class="tooltip-content">${tooltipContent}</div>
+                                    </span>
+                                </span>
+                            </li>\n`;
+      } else {
+        html += `                            <li><strong>${escapeHtml(feat.name)}</strong></li>\n`;
+      }
     });
   } else {
     html += `                            <li><em>No feats</em></li>\n`;
