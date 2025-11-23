@@ -263,8 +263,8 @@ function generateCharacterHTML(characterData) {
         if (descObj && descObj.p) {
           // Join all paragraphs
           description = descObj.p.map(p => {
-            if (typeof p === 'string') return p;
-            if (p && p._) return p._;
+            if (typeof p === 'string') return p.trim();
+            if (p && p._) return p._.trim();
             return '';
           }).filter(Boolean).join('\n\n');
         }
