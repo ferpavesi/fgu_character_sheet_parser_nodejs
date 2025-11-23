@@ -188,12 +188,41 @@
         let characterSheetHTML = null;
         let filename = 'character_sheet.html';
         
-        // Load character sheet from sessionStorage
-        function loadCharacterSheet() {
-            characterSheetHTML = sessionStorage.getItem('characterSheet');
-            filename = sessionStorage.getItem('characterSheetFilename') || 'character_sheet.html';
-            
-            if (!characterSheetHTML) {
+        // Load character sheet from server session
+        async function loadCharacterSheet() {
+            try {
+                const response = await fetch('/api/character-sheet');
+                
+                if (!response.ok) {
+                    throw new Error('No character sheet found');
+                }
+                
+                const data = await response.json();
+                characterSheetHTML = data.html;
+                filename = data.filename || 'character_sheet.html';
+                
+                // Extract character name from HTML for display
+                const nameMatch = characterSheetHTML.match(/<h1>(.*?)<\/h1>/);
+                if (nameMatch && nameMatch[1]) {
+                    characterNameEl.textContent = nameMatch[1];
+                } else if (data.name) {
+                    characterNameEl.textContent = data.name;
+                }
+                
+                // Create iframe and inject HTML
+                const iframe = document.createElement('iframe');
+                iframe.className = 'preview-frame';
+                previewContainer.innerHTML = '';
+                previewContainer.appendChild(iframe);
+                
+                // Write HTML to iframe
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                iframeDoc.open();
+                iframeDoc.write(characterSheetHTML);
+                iframeDoc.close();
+                
+            } catch (error) {
+                console.error('Error loading character sheet:', error);
                 previewContainer.innerHTML = `
                     <div class="error-message">
                         <h2>No character sheet found</h2>
@@ -203,26 +232,7 @@
                         </button>
                     </div>
                 `;
-                return;
             }
-            
-            // Extract character name from HTML for display
-            const nameMatch = characterSheetHTML.match(/<h1>(.*?)<\/h1>/);
-            if (nameMatch && nameMatch[1]) {
-                characterNameEl.textContent = nameMatch[1];
-            }
-            
-            // Create iframe and inject HTML
-            const iframe = document.createElement('iframe');
-            iframe.className = 'preview-frame';
-            previewContainer.innerHTML = '';
-            previewContainer.appendChild(iframe);
-            
-            // Write HTML to iframe
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-            iframeDoc.open();
-            iframeDoc.write(characterSheetHTML);
-            iframeDoc.close();
         }
         
         // Download character sheet
@@ -242,8 +252,6 @@
         
         // Generate another character sheet
         newSheetBtn.addEventListener('click', () => {
-            sessionStorage.removeItem('characterSheet');
-            sessionStorage.removeItem('characterSheetFilename');
             window.location.href = '/';
         });
         

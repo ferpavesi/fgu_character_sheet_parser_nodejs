@@ -348,12 +348,8 @@
                     throw new Error(result.error || 'Error generating character sheet');
                 }
                 
-                // Store the HTML and filename for preview
-                sessionStorage.setItem('characterSheet', result.html);
-                sessionStorage.setItem('characterSheetFilename', result.filename);
-                
-                // Redirect to preview page
-                window.location.href = '/preview';
+                // Redirect to preview page (HTML is stored in session on server)
+                window.location.href = result.redirect || '/preview';
                 
             } catch (error) {
                 console.error('Error:', error);

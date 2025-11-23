@@ -2,9 +2,18 @@ const express = require('express');
 const multer = require('multer');
 const xml2js = require('xml2js');
 const path = require('path');
+const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Session middleware
+app.use(session({
+  secret: 'fgu-character-sheet-secret-key-' + Math.random(),
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 3600000 } // 1 hour
+}));
 
 // Configure multer for file uploads (memory storage)
 const upload = multer({
@@ -38,9 +47,14 @@ function safeGet(obj, path, defaultValue = '') {
   while (Array.isArray(result) && result.length === 1) {
     result = result[0];
   }
-  // Handle string values that come wrapped in objects with _
-  if (result && typeof result === 'object' && '_' in result) {
-    return result._ || defaultValue;
+  // Handle string values that come wrapped in objects with _ or $t
+  if (result && typeof result === 'object') {
+    if ('_' in result) {
+      return result._;
+    }
+    if ('$t' in result) {
+      return result.$t;
+    }
   }
   return result || defaultValue;
 }
@@ -92,13 +106,13 @@ function generateCharacterHTML(characterData) {
   Object.keys(classesData).forEach(key => {
     if (key.startsWith('id-')) {
       const cls = classesData[key][0];
-      const className = safeGet(cls, 'name.0.$t') || safeGet(cls, 'name.0');
-      const classLevel = safeGet(cls, 'level.0.$t') || safeGet(cls, 'level.0') || safeGet(cls, 'level');
-      const classSpec = safeGet(cls, 'specialization.0.$t') || safeGet(cls, 'specialization.0');
+      const className = safeGet(cls, 'name.0');
+      const classLevel = safeGet(cls, 'level.0');
+      const classSpec = safeGet(cls, 'specialization.0');
       const levelNum = parseInt(classLevel) || 0;
       totalLevel += levelNum;
       if (className) {
-        classesInfo.push({ name: className, level: classLevel || levelNum.toString(), specialization: classSpec });
+        classesInfo.push({ name: className, level: classLevel, specialization: classSpec });
       }
     }
   });
@@ -113,28 +127,28 @@ function generateCharacterHTML(characterData) {
     const abil = safeGet(char, `abilities.0.${abilName}.0`);
     if (abil) {
       abilities[abilName] = {
-        score: safeGet(abil, 'score.0.$t') || safeGet(abil, 'score.0'),
-        bonus: safeGet(abil, 'bonus.0.$t') || safeGet(abil, 'bonus.0'),
-        save: safeGet(abil, 'save.0.$t') || safeGet(abil, 'save.0'),
-        saveprof: (safeGet(abil, 'saveprof.0.$t') || safeGet(abil, 'saveprof.0')) === '1'
+        score: safeGet(abil, 'score.0'),
+        bonus: safeGet(abil, 'bonus.0'),
+        save: safeGet(abil, 'save.0'),
+        saveprof: safeGet(abil, 'saveprof.0') === '1'
       };
     }
   });
   
   // Extract HP
   const hp = safeGet(char, 'hp.0', {});
-  const hpTotal = safeGet(hp, 'total.0.$t') || safeGet(hp, 'total.0', '0');
-  const hpWounds = safeGet(hp, 'wounds.0.$t') || safeGet(hp, 'wounds.0', '0');
-  const hpTemp = safeGet(hp, 'temporary.0.$t') || safeGet(hp, 'temporary.0', '0');
+  const hpTotal = safeGet(hp, 'total.0', '0');
+  const hpWounds = safeGet(hp, 'wounds.0', '0');
+  const hpTemp = safeGet(hp, 'temporary.0', '0');
   
   // Extract AC
-  const ac = safeGet(char, 'defenses.0.ac.0.total.0.$t') || safeGet(char, 'defenses.0.ac.0.total.0', '10');
+  const ac = safeGet(char, 'defenses.0.ac.0.total.0', '10');
   
   // Extract Speed
-  const speed = safeGet(char, 'speed.0.total.0.$t') || safeGet(char, 'speed.0.total.0', '30');
+  const speed = safeGet(char, 'speed.0.total.0', '30');
   
   // Extract Initiative
-  let initiative = safeGet(char, 'initiative.0.total.0.$t') || safeGet(char, 'initiative.0.total.0');
+  let initiative = safeGet(char, 'initiative.0.total.0');
   if (!initiative && abilities.dexterity) {
     initiative = abilities.dexterity.bonus;
   }
@@ -146,10 +160,10 @@ function generateCharacterHTML(characterData) {
     if (key.startsWith('id-')) {
       const skill = skillListData[key][0];
       skills.push({
-        name: safeGet(skill, 'name.0.$t') || safeGet(skill, 'name.0'),
-        total: safeGet(skill, 'total.0.$t') || safeGet(skill, 'total.0'),
-        prof: (safeGet(skill, 'prof.0.$t') || safeGet(skill, 'prof.0')) === '1',
-        stat: safeGet(skill, 'stat.0.$t') || safeGet(skill, 'stat.0')
+        name: safeGet(skill, 'name.0'),
+        total: safeGet(skill, 'total.0'),
+        prof: safeGet(skill, 'prof.0') === '1',
+        stat: safeGet(skill, 'stat.0')
       });
     }
   });
@@ -162,8 +176,8 @@ function generateCharacterHTML(characterData) {
     if (key.startsWith('id-')) {
       const feature = featureListData[key][0];
       features.push({
-        name: safeGet(feature, 'name.0.$t') || safeGet(feature, 'name.0'),
-        level: safeGet(feature, 'level.0.$t') || safeGet(feature, 'level.0')
+        name: safeGet(feature, 'name.0'),
+        level: safeGet(feature, 'level.0')
       });
     }
   });
@@ -175,9 +189,9 @@ function generateCharacterHTML(characterData) {
     if (key.startsWith('id-')) {
       const feat = featListData[key][0];
       feats.push({
-        name: safeGet(feat, 'name.0.$t') || safeGet(feat, 'name.0'),
-        category: safeGet(feat, 'category.0.$t') || safeGet(feat, 'category.0'),
-        level: safeGet(feat, 'level.0.$t') || safeGet(feat, 'level.0')
+        name: safeGet(feat, 'name.0'),
+        category: safeGet(feat, 'category.0'),
+        level: safeGet(feat, 'level.0')
       });
     }
   });
@@ -189,9 +203,9 @@ function generateCharacterHTML(characterData) {
     if (key.startsWith('id-')) {
       const item = invListData[key][0];
       inventory.push({
-        name: safeGet(item, 'name.0.$t') || safeGet(item, 'name.0'),
-        count: safeGet(item, 'count.0.$t') || safeGet(item, 'count.0', '1'),
-        cost: safeGet(item, 'cost.0.$t') || safeGet(item, 'cost.0', '')
+        name: safeGet(item, 'name.0'),
+        count: safeGet(item, 'count.0', '1'),
+        cost: safeGet(item, 'cost.0', '')
       });
     }
   });
@@ -202,8 +216,8 @@ function generateCharacterHTML(characterData) {
   Object.keys(coinsData).forEach(key => {
     if (key.startsWith('id-')) {
       const coin = coinsData[key][0];
-      const coinName = safeGet(coin, 'name.0.$t') || safeGet(coin, 'name.0');
-      const coinAmount = safeGet(coin, 'amount.0.$t') || safeGet(coin, 'amount.0', '0');
+      const coinName = safeGet(coin, 'name.0');
+      const coinAmount = safeGet(coin, 'amount.0', '0');
       if (coinName) {
         coins[coinName] = coinAmount;
       }
@@ -217,8 +231,8 @@ function generateCharacterHTML(characterData) {
     const slotKey = `spellslots${i}`;
     if (powermeta[slotKey] && powermeta[slotKey][0]) {
       const slot = powermeta[slotKey][0];
-      const maxSlots = safeGet(slot, 'max.0.$t') || safeGet(slot, 'max.0', '0');
-      const usedSlots = safeGet(slot, 'used.0.$t') || safeGet(slot, 'used.0', '0');
+      const maxSlots = safeGet(slot, 'max.0', '0');
+      const usedSlots = safeGet(slot, 'used.0', '0');
       if (maxSlots !== '0') {
         spellSlots[i] = { max: maxSlots, used: usedSlots };
       }
@@ -231,10 +245,10 @@ function generateCharacterHTML(characterData) {
   Object.keys(powersData).forEach(key => {
     if (key.startsWith('id-')) {
       const power = powersData[key][0];
-      const powerName = safeGet(power, 'name.0.$t') || safeGet(power, 'name.0');
+      const powerName = safeGet(power, 'name.0');
       if (powerName === 'Sorcery Points') {
-        const max = safeGet(power, 'prepared.0.$t') || safeGet(power, 'prepared.0', '0');
-        const used = safeGet(power, 'locked.0.$t') || safeGet(power, 'locked.0', '0');
+        const max = safeGet(power, 'prepared.0', '0');
+        const used = safeGet(power, 'locked.0', '0');
         if (max !== '0') {
           sorceryPoints = { max, used };
         }
@@ -247,17 +261,17 @@ function generateCharacterHTML(characterData) {
   Object.keys(powersData).forEach(key => {
     if (key.startsWith('id-')) {
       const power = powersData[key][0];
-      const group = safeGet(power, 'group.0.$t') || safeGet(power, 'group.0', '');
-      const level = safeGet(power, 'level.0.$t') || safeGet(power, 'level.0', '');
-      const school = safeGet(power, 'school.0.$t') || safeGet(power, 'school.0', '');
+      const group = safeGet(power, 'group.0', '');
+      const level = safeGet(power, 'level.0', '');
+      const school = safeGet(power, 'school.0', '');
       
       if ((group.includes('Spells') || school) && level) {
         spells.push({
-          name: safeGet(power, 'name.0.$t') || safeGet(power, 'name.0'),
+          name: safeGet(power, 'name.0'),
           level: level,
-          prepared: safeGet(power, 'prepared.0.$t') || safeGet(power, 'prepared.0', '0'),
+          prepared: safeGet(power, 'prepared.0', '0'),
           school: school,
-          description: safeGet(power, 'description.0.$t') || safeGet(power, 'description.0', '')
+          description: safeGet(power, 'description.0', '')
         });
       }
     }
@@ -876,8 +890,9 @@ app.post('/generate', upload.single('file'), async (req, res) => {
     
     // Extract character name for filename
     let filename = 'character_sheet.html';
+    let charName = '';
     try {
-      const charName = safeGet(result, 'root.character.0.name.0.$t') || safeGet(result, 'root.character.0.name.0');
+      charName = safeGet(result, 'root.character.0.name.0') || '';
       if (charName) {
         const cleanName = String(charName).replace(/[^a-zA-Z0-9 _-]/g, '').trim();
         if (cleanName) {
@@ -891,11 +906,15 @@ app.post('/generate', upload.single('file'), async (req, res) => {
     // Generate HTML
     const html = generateCharacterHTML(result.root || result);
     
-    // Return JSON with HTML and filename
+    // Store HTML in session
+    req.session.characterSheetHTML = html;
+    req.session.characterSheetFilename = filename;
+    req.session.characterName = charName || 'Character Sheet';
+    
+    // Return JSON with success and redirect
     res.json({
-      html: html,
-      filename: filename,
-      success: true
+      success: true,
+      redirect: '/preview'
     });
     
   } catch (error) {
@@ -906,6 +925,26 @@ app.post('/generate', upload.single('file'), async (req, res) => {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Preview route
+app.get('/preview', (req, res) => {
+  if (!req.session.characterSheetHTML) {
+    return res.redirect('/');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'preview.html'));
+});
+
+// API endpoint to get character sheet HTML from session
+app.get('/api/character-sheet', (req, res) => {
+  if (!req.session.characterSheetHTML) {
+    return res.status(404).json({ error: 'No character sheet found' });
+  }
+  res.json({
+    html: req.session.characterSheetHTML,
+    filename: req.session.characterSheetFilename || 'character_sheet.html',
+    name: req.session.characterName || 'Character Sheet'
+  });
 });
 
 app.listen(PORT, () => {
