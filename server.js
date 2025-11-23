@@ -895,7 +895,14 @@ app.post('/generate', upload.single('file'), async (req, res) => {
     }
     
     // Generate HTML
-    const html = generateCharacterHTML(result.root || result);
+    let html;
+    try {
+      html = generateCharacterHTML(result.root || result);
+      console.log('HTML generated, length:', html.length);
+    } catch (htmlError) {
+      console.error('Error generating HTML:', htmlError);
+      throw new Error('Failed to generate HTML: ' + htmlError.message);
+    }
     
     // Return HTML directly
     res.json({
