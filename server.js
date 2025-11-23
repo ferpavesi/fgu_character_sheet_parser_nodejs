@@ -257,12 +257,24 @@ function generateCharacterHTML(characterData) {
       const school = safeGet(power, 'school.0', '');
       
       if ((group.includes('Spells') || school) && level) {
+        // Extract description from formatted text
+        let description = '';
+        const descObj = power.description ? power.description[0] : null;
+        if (descObj && descObj.p) {
+          // Join all paragraphs
+          description = descObj.p.map(p => {
+            if (typeof p === 'string') return p;
+            if (p && p._) return p._;
+            return '';
+          }).filter(Boolean).join('\n\n');
+        }
+        
         spells.push({
           name: safeGet(power, 'name.0'),
           level: level,
           prepared: safeGet(power, 'prepared.0', '0'),
           school: school,
-          description: safeGet(power, 'description.0', '')
+          description: description
         });
       }
     }
@@ -819,7 +831,13 @@ function generateCharacterHTML(characterData) {
         }
         
         if (spell.description) {
-          html += `                        <div class="spell-description">${spell.description}</div>\n`;
+          // Split description into paragraphs and escape each
+          const paragraphs = spell.description.split('\n\n').filter(Boolean);
+          html += `                        <div class="spell-description" style="margin-top: 5px; font-size: 0.9em; white-space: pre-wrap;">`;
+          paragraphs.forEach(para => {
+            html += `<p style="margin: 5px 0;">${escapeHtml(para)}</p>`;
+          });
+          html += `</div>\n`;
         }
         
         html += `                    </div>\n`;
