@@ -126,6 +126,34 @@ function generateCharacterHTML(characterData) {
     }
   });
   
+  // Determine spellcasting ability based on class
+  let spellcastingAbility = null;
+  let spellcastingMod = 0;
+  
+  classesInfo.forEach(cls => {
+    const className = cls.name.toLowerCase();
+    if (className.includes('wizard')) {
+      spellcastingAbility = 'intelligence';
+    } else if (className.includes('druid') || className.includes('cleric') || className.includes('ranger')) {
+      spellcastingAbility = 'wisdom';
+    } else if (className.includes('paladin') || className.includes('sorcerer') || className.includes('bard') || className.includes('warlock')) {
+      spellcastingAbility = 'charisma';
+    }
+  });
+  
+  if (spellcastingAbility && abilities[spellcastingAbility]) {
+    spellcastingMod = parseInt(abilities[spellcastingAbility].bonus) || 0;
+  }
+  
+  // Calculate spell save DC and spell attack bonus
+  const spellSaveDC = 8 + profBonus + spellcastingMod;
+  const spellAttackBonus = profBonus + spellcastingMod;
+  
+  // Calculate melee attack bonus (Strength + Proficiency, unless using finesse)
+  const strMod = parseInt(abilities.strength?.bonus || 0);
+  const dexMod = parseInt(abilities.dexterity?.bonus || 0);
+  const meleeAttackBonus = strMod + profBonus;
+  
   // Extract HP
   const hp = safeGet(char, 'hp.0', {});
   const hpTotal = safeGet(hp, 'total.0', '0');
@@ -753,9 +781,17 @@ function generateCharacterHTML(characterData) {
                                 <strong>Initiative:</strong>
                                 <div style="font-size: 1.5em; font-weight: bold; color: #8b6914;">${formatModifier(initiative)}</div>
                             </div>
-                            <div>
+                            <div style="margin-bottom: 15px;">
                                 <strong>Speed:</strong>
                                 <div style="font-size: 1.5em; font-weight: bold; color: #8b6914;">${escapeHtml(speed)} ft</div>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <strong>Proficiency Bonus:</strong>
+                                <div style="font-size: 1.5em; font-weight: bold; color: #8b6914;">${formatModifier(profBonus)}</div>
+                            </div>
+                            <div>
+                                <strong>Melee Attack Bonus:</strong>
+                                <div style="font-size: 1.5em; font-weight: bold; color: #8b6914;">${formatModifier(meleeAttackBonus)}</div>
                             </div>
                         </div>
                     </div>
@@ -924,7 +960,21 @@ function generateCharacterHTML(characterData) {
   
   // Spells
   if (spells.length > 0) {
-    html += `            <div class="section">
+    html += `            <div class="section" style="margin-bottom: 15px;">
+                <h2>Spellcasting</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center; padding: 10px;">
+                    <div>
+                        <strong>Spell Save DC:</strong>
+                        <div style="font-size: 1.5em; font-weight: bold; color: #8b6914;">${escapeHtml(spellSaveDC.toString())}</div>
+                    </div>
+                    <div>
+                        <strong>Spell Attack Bonus:</strong>
+                        <div style="font-size: 1.5em; font-weight: bold; color: #8b6914;">${formatModifier(spellAttackBonus)}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h2 style="margin: 0;">Spells</h2>
                     <div style="display: flex; gap: 8px;">
